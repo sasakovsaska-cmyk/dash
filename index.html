@@ -245,7 +245,6 @@
                     <button class="icon-btn" style="width:28px; height:28px; box-shadow:none; border:none;" onclick="changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
                     <span id="monthTitle" style="font-size:15px; font-weight:600;">Месяц</span>
                     <button class="icon-btn" style="width:28px; height:28px; box-shadow:none; border:none;" onclick="changeMonth(1)"><i class="ph ph-caret-right"></i></button>
-                    <!-- ВОЗВРАЩЕНА КНОПКА СВОРАЧИВАНИЯ КАЛЕНДАРЯ -->
                     <button class="icon-btn" id="calToggleBtn" onclick="toggleCalendar()" title="Свернуть/Развернуть" style="margin-left:10px;"><i class="ph ph-caret-up"></i></button>
                 </div>
             </div>
@@ -417,7 +416,7 @@
             } catch(e) {
                 console.error("Ошибка при загрузке данных:", e);
                 document.getElementById('loadingText').style.display = 'none';
-                alert("Ошибка базы данных: " + e.message + ". Проверьте правила (Rules) и имя базы в Firebase.");
+                alert("ОШИБКА ДОСТУПА К БАЗЕ: " + e.message + "\n\nСкорее всего, в Firebase не применены правила (Rules).");
                 document.getElementById('authScreen').style.display = 'flex';
                 document.getElementById('appContainer').style.display = 'none';
             }
@@ -431,17 +430,39 @@
 
     async function loadUserData(uid) {
         try {
+            // 1. Сначала берем из кэша браузера (на случай если Firebase упадет)
+            const cached = localStorage.getItem('lifeOS_cache');
+            if (cached) {
+                try { appData = JSON.parse(cached); } catch(e){}
+            }
+
             const docSnap = await getDoc(doc(db, "users", uid));
             if (docSnap.exists()) {
                 currentUserData = docSnap.data();
-                if (currentUserData.appData) appData = { ...appData, ...currentUserData.appData };
+                if (!currentUserData.subEndDate) {
+                    const now = new Date();
+                    currentUserData.subEndDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                    await setDoc(doc(db, "users", uid), currentUserData);
+                }
+                if (currentUserData.appData) {
+                    appData = { ...appData, ...currentUserData.appData };
+                    localStorage.setItem('lifeOS_cache', JSON.stringify(appData));
+                }
             } else {
                 const now = new Date();
                 const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
                 currentUserData = { email: auth.currentUser.email, createdAt: now.toISOString(), subEndDate: trialEnd.toISOString(), isBlocked: false, appData: appData, lastSeen: now.toISOString() };
                 await setDoc(doc(db, "users", uid), currentUserData);
             }
-        } catch (e) { console.error("Ошибка loadUserData:", e); throw e; }
+        } catch (e) { 
+            console.error("Ошибка loadUserData:", e); 
+            // Если Firebase недоступен, работаем с тем, что есть в кэше
+            if (!currentUserData) {
+                const now = new Date();
+                const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                currentUserData = { email: auth.currentUser.email, createdAt: now.toISOString(), subEndDate: trialEnd.toISOString(), isBlocked: false, appData: appData, lastSeen: now.toISOString() };
+            }
+        }
     }
 
     async function loadPricing() {
@@ -450,7 +471,7 @@
             if (docSnap.exists()) pricingPlans = docSnap.data().plans;
             renderPricingGrid();
             if (isSecretAdminMode) renderAdminPricing();
-        } catch (e) { console.error("Ошибка loadPricing:", e); throw e; }
+        } catch (e) { console.error("Ошибка loadPricing:", e); }
     }
 
     function checkSubscription() {
@@ -469,19 +490,36 @@
 
     function showPaymentScreen() { document.getElementById('appContainer').style.display = 'none'; document.getElementById('paymentScreen').style.display = 'flex'; }
 
-    let saveTimeout;
-    function save() {
+    // ИСПРАВЛЕННОЕ СОХРАНЕНИЕ (Кэш + Firebase с выводом ошибки)
+    async function save() {
         try {
             updateAI(); updateDashboardStats();
             if(document.getElementById('page-dashboard').classList.contains('active')) updateCharts();
             if(document.getElementById('page-planner').classList.contains('active')) renderMonthCalendar();
+            
+            // Сохраняем в кэш браузера моментально (защита от сбоя)
+            localStorage.setItem('lifeOS_cache', JSON.stringify(appData));
+
             if (!currentUserId || isSecretAdminMode) return;
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(async () => {
-                try { await setDoc(doc(db, "users", currentUserId), { ...currentUserData, appData: appData }); } catch (e) { console.error("Save error:", e); }
-            }, 1000); 
+            
+            try {
+                await setDoc(doc(db, "users", currentUserId), { ...currentUserData, appData: appData });
+            } catch (e) {
+                console.error("Ошибка Firebase:", e);
+                // Если ошибка прав, показываем пользователю
+                if(e.code === 'permission-denied' || e.message.includes('permission')) {
+                    alert("ОШИБКА: База данных запрещает сохранение. Администратор должен опубликовать правила (Rules) в Firebase.");
+                }
+            }
         } catch(e) { console.error("Ошибка save:", e); }
     }
+
+    window.addEventListener('beforeunload', () => {
+        if (currentUserId && !isSecretAdminMode) {
+            localStorage.setItem('lifeOS_cache', JSON.stringify(appData));
+            setDoc(doc(db, "users", currentUserId), { ...currentUserData, appData: appData }).catch(()=>{});
+        }
+    });
 
     function renderPricingGrid() {
         const grid = document.getElementById('pricingGrid'); grid.innerHTML = '';
@@ -501,7 +539,6 @@
 
     window.closeModal = function(id) { document.getElementById(id).classList.remove('active'); }
 
-    // АДМИНКА
     window.loadAdminData = async function() {
         const tbody = document.querySelector('#adminUsersTable tbody'); tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Загрузка...</td></tr>';
         document.getElementById('adminSearch').value = '';
@@ -593,13 +630,11 @@
         save();
     };
 
-    // СВОРАЧИВАНИЕ КАЛЕНДАРЯ
     window.toggleCalendar = function() {
         const wrapper = document.getElementById('calendarWrapper');
         const btn = document.getElementById('calToggleBtn');
         wrapper.classList.toggle('collapsed');
         btn.classList.toggle('collapsed');
-        // Меняем иконку
         if(wrapper.classList.contains('collapsed')) btn.innerHTML = '<i class="ph ph-caret-down"></i>';
         else btn.innerHTML = '<i class="ph ph-caret-up"></i>';
     }
@@ -640,7 +675,6 @@
         if (notes.length === 0 && dayTasks.length === 0) { list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:13px; padding:20px 0;">Нет записей</div>'; return; }
         notes.forEach(note => { 
             const div = document.createElement('div'); div.className = 'event-item'; div.style = "display:flex; justify-content:space-between; padding:10px; background:var(--surface-soft); border-radius:8px;"; 
-            // ВОЗВРАЩЕН ТЕКСТ "СДЕЛАТЬ ЗАДАЧЕЙ"
             div.innerHTML = `<span>${note.text}</span><div style="display:flex; gap:10px;"><button class="btn-convert" onclick="convertNoteToTask('${note.id}')"><i class="ph ph-arrow-right"></i> Сделать задачей</button><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteDayItem('${note.id}', 'note')"><i class="ph ph-trash"></i></button></div>`; 
             list.appendChild(div); 
         });
@@ -678,7 +712,6 @@
     window.saveTaskNote = function(dateStr, idx, val) { appData.tasks[dateStr][idx].note = val; save(); }
     window.saveNoteHeight = function(dateStr, idx, height) { appData.tasks[dateStr][idx].noteHeight = height; save(); }
 
-    // ПРИВЫЧКИ
     window.renderHabits = function() {
         const list = document.getElementById('habitsList'); const header = document.getElementById('habitDatesHeader');
         if(!list || !header) return;
@@ -698,7 +731,6 @@
     window.toggleHabit = function(id, dateStr) { const habit = appData.habits.find(h => h.id === id); const idx = habit.history.indexOf(dateStr); if (idx > -1) habit.history.splice(idx, 1); else habit.history.push(dateStr); save(); renderHabits(); }
     window.addHabit = function() { appData.habits.push({ id: Date.now().toString(), name: 'Новый ритуал', history: [] }); save(); renderHabits(); }
 
-    // ЗДОРОВЬЕ И ИИ
     window.setRating = function(metric, value) { const today = getFormattedDate(new Date()); if (!appData.health[today]) appData.health[today] = { sleep: 0, energy: 0, mood: 0, water: 0, food: 0, sport: 0 }; const h = appData.health[today]; h[metric] = (h[metric] === value) ? 0 : value; save(); loadHealthData(); }
     
     function loadHealthData() { 
@@ -710,7 +742,6 @@
         updateHealthAI(h); 
     }
 
-    // ИСПРАВЛЕННЫЙ ИИ (теперь пишет советы даже для средних значений)
     function updateHealthAI(h) { 
         let paragraphs = []; 
         const isSleepBad = h.sleep > 0 && h.sleep <= 4; 
@@ -729,17 +760,17 @@
         
         if (isSleepBad) paragraphs.push(`🚨 <b>Внимание на сон.</b> Ты спал мало. Когнитивные способности снижены, отложи сложные задачи.`); 
         else if (isSleepGood) paragraphs.push(`✅ <b>Отличный сон!</b> Идеальное время для важных дел.`); 
-        else if (h.sleep > 0) paragraphs.push(`😴 <b>Сон средний.</b> Энергии должно хватить, но следи за перерывами.`); // Добавлено среднее значение
+        else if (h.sleep > 0) paragraphs.push(`😴 <b>Сон средний.</b> Энергии должно хватить, но следи за перерывами.`); 
         
         if (isEnergyBad) paragraphs.push(`🔋 <b>Низкая энергия.</b> Не работай через силу. Сделай разминку или выпей чаю.`); 
-        else if (h.energy >= 7) paragraphs.push(`🔥 <b>Много энергии!</b> Отличный день, чтобы сделать самые сложные дела.`); // Добавлено хорошее значение
+        else if (h.energy >= 7) paragraphs.push(`🔥 <b>Много энергии!</b> Отличный день, чтобы сделать самые сложные дела.`); 
         
         if (isFoodBad && isSportGood) paragraphs.push(`🍔 <b>Дисбаланс питания и нагрузок.</b> Тяжелая пища при тренировке вызовет сонливость.`); 
         else if (isSportGood) paragraphs.push(`🏋️ <b>Отличная тренировка!</b> Не забудь восполнить водный баланс.`); 
-        else if (h.sport > 0 && h.sport <= 3) paragraphs.push(`🛋️ <b>Мало движения.</b> Постарайся хотя бы 15 минут погулять перед сном.`); // Добавлено
+        else if (h.sport > 0 && h.sport <= 3) paragraphs.push(`🛋️ <b>Мало движения.</b> Постарайся хотя бы 15 минут погулять перед сном.`); 
         
         if (isWaterBad) paragraphs.push(`💧 <b>Мало воды.</b> Выпей стакан прямо сейчас.`); 
-        else if (h.water >= 7) paragraphs.push(`💧 <b>Отличный водный баланс.</b> Так держать!`); // Добавлено
+        else if (h.water >= 7) paragraphs.push(`💧 <b>Отличный водный баланс.</b> Так держать!`); 
         
         if (h.sleep <= 5 && isSportGood) paragraphs.push(`⚠️ <b>Переутомление:</b> Тренировка при недосыпе — стресс. Ляг пораньше.`); 
         
