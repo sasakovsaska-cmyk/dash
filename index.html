@@ -66,6 +66,9 @@
         .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
         .chart-box { height: 260px; width: 100%; }
         
+        .calendar-wrapper { max-height: 2000px; overflow: hidden; transition: max-height 0.4s ease, opacity 0.3s ease; opacity: 1; }
+        .calendar-wrapper.collapsed { max-height: 0; opacity: 0; margin-top: 0; padding-top: 0; }
+        
         .month-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
         .cal-day-name { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); }
         .cal-cell { min-height: 100px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px; cursor: pointer; }
@@ -73,6 +76,7 @@
         .cal-date { font-weight: 600; font-size: 14px; }
         .cal-events-container { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
         .cal-pill { font-size: 10px; padding: 3px 6px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+        
         .week-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; align-items: start; }
         .day-col:nth-child(1), .day-col:nth-child(2), .day-col:nth-child(3), .day-col:nth-child(4) { grid-column: span 3; }
         .day-col:nth-child(5), .day-col:nth-child(6), .day-col:nth-child(7) { grid-column: span 4; }
@@ -80,13 +84,13 @@
         .circle-prog { width: 40px; height: 40px; border-radius: 50%; margin: 8px auto; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: conic-gradient(var(--accent) var(--p, 0%), var(--border) 0); position: relative; }
         .circle-prog::after { content: ''; position: absolute; width: 32px; height: 32px; background: var(--surface-soft); border-radius: 50%; }
         .circle-prog span { position: relative; z-index: 1; }
+        
         .t-item { display: flex; flex-direction: column; gap: 6px; background: var(--surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 8px; }
         .t-header { display: flex; gap: 8px; }
         .task-text { flex: 1; border: none; background: transparent; font-size: 14px; outline: none; color: var(--text); resize: none; overflow: hidden; line-height: 1.5; font-family: inherit; }
         .t-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 4px; }
         .task-note-input { width: 100%; padding: 8px; font-size: 13px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 6px; resize: vertical; outline: none; margin-top: 6px; font-family: inherit; }
 
-        /* Стили для привычек */
         .habits-header { display: grid; grid-template-columns: 1fr auto 24px; gap: 16px; align-items: center; margin-bottom: 16px; padding: 0 16px; }
         .h-days { display: grid; grid-template-columns: repeat(7, 36px); gap: 10px; }
         .h-day-label { width: 36px; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); }
@@ -135,7 +139,6 @@
 </head>
 <body>
 
-<!-- СКРЫТАЯ АДМИНКА -->
 <div id="secretAdminPanel">
     <div class="admin-header">
         <h2 style="font-family:'Playfair Display'; color:var(--accent);">Admin Dashboard</h2>
@@ -148,9 +151,7 @@
     </div>
     <div class="card" style="margin-bottom: 20px;">
         <div class="card-title">Пользователи</div>
-        
         <input type="text" id="adminSearch" class="input-field" placeholder="🔍 Поиск по логину (email)..." oninput="filterAdminTable()" style="margin-bottom: 15px;">
-        
         <div style="overflow-x:auto;">
             <table class="admin-table" id="adminUsersTable">
                 <thead><tr><th>Email</th><th>Статус</th><th>До</th><th>Действия</th></tr></thead>
@@ -165,7 +166,6 @@
     </div>
 </div>
 
-<!-- МОДАЛЬНЫЕ ОКНА -->
 <div class="modal-overlay" id="secretPasswordModal" style="z-index: 10005;">
     <div class="modal-content" style="text-align:center; max-width:300px;">
         <h3 style="margin-bottom:15px;">Access Denied</h3>
@@ -185,7 +185,6 @@
     </div>
 </div>
 
-<!-- ЭКРАН ВХОДА -->
 <div id="authScreen">
     <div class="auth-box">
         <h2>LifeOS</h2>
@@ -199,7 +198,6 @@
     </div>
 </div>
 
-<!-- ЭКРАН ТАРИФОВ -->
 <div id="paymentScreen" style="display: none;">
     <div class="pricing-box">
         <h2>Доступ приостановлен</h2>
@@ -209,7 +207,6 @@
     </div>
 </div>
 
-<!-- МОДАЛКА ОПЛАТЫ -->
 <div class="modal-overlay" id="payModal">
     <div class="modal-content" style="text-align:center;">
         <h3 style="margin-bottom:15px; font-size:22px;">Оплата через Telegram</h3>
@@ -219,7 +216,6 @@
     </div>
 </div>
 
-<!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
 <div id="appContainer">
     <header>
         <div class="logo" id="mainLogo"><i class="ph ph-flower-lotus"></i> LifeOS</div>
@@ -233,8 +229,6 @@
             <button class="icon-btn" onclick="logoutUser()" title="Выйти"><i class="ph ph-sign-out"></i></button>
         </div>
     </header>
-    
-    <!-- ДАШБОРД -->
     <div id="page-dashboard" class="page active">
         <div class="dash-header-stats" id="dashStatsContainer"></div>
         <div class="ai-briefing"><h3><i class="ph ph-sparkle"></i> Утренний брифинг</h3><p id="aiBriefingText">Загрузка...</p></div>
@@ -243,18 +237,19 @@
             <div class="card"><div class="card-title">Ресурсы</div><div id="chartHealth" class="chart-box"></div></div>
         </div>
     </div>
-    
-    <!-- ПЛАНИРОВЩИК -->
     <div id="page-planner" class="page">
         <div class="card" style="padding-bottom: 16px;">
-            <div class="card-title" style="margin-bottom: 12px;"><span>Мой месяц</span>
+            <div class="card-title" style="margin-bottom: 12px;">
+                <span>Мой месяц</span>
                 <div style="display:flex; gap:12px; align-items:center;">
                     <button class="icon-btn" style="width:28px; height:28px; box-shadow:none; border:none;" onclick="changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
                     <span id="monthTitle" style="font-size:15px; font-weight:600;">Месяц</span>
                     <button class="icon-btn" style="width:28px; height:28px; box-shadow:none; border:none;" onclick="changeMonth(1)"><i class="ph ph-caret-right"></i></button>
+                    <!-- ВОЗВРАЩЕНА КНОПКА СВОРАЧИВАНИЯ КАЛЕНДАРЯ -->
+                    <button class="icon-btn" id="calToggleBtn" onclick="toggleCalendar()" title="Свернуть/Развернуть" style="margin-left:10px;"><i class="ph ph-caret-up"></i></button>
                 </div>
             </div>
-            <div class="calendar-wrapper"><div class="month-calendar" id="monthCalendarGrid"></div></div>
+            <div class="calendar-wrapper" id="calendarWrapper"><div class="month-calendar" id="monthCalendarGrid"></div></div>
         </div>
         
         <div class="card">
@@ -262,7 +257,6 @@
             <div class="week-grid" id="weekGrid"></div>
         </div>
 
-        <!-- ВОЗВРАЩЕННЫЕ ПРИВЫЧКИ -->
         <div class="card">
             <div class="card-title">Ритуалы</div>
             <div class="habits-header">
@@ -274,8 +268,6 @@
             <button class="add-btn" onclick="addHabit()">+ Новый ритуал</button>
         </div>
     </div>
-    
-    <!-- ЗДОРОВЬЕ -->
     <div id="page-health" class="page">
         <div class="health-layout">
             <div class="card">
@@ -295,7 +287,6 @@
     </div>
 </div>
 
-<!-- МОДАЛКИ ПЛАНЕРА -->
 <div class="modal-overlay" id="dayModal"><div class="modal-content" style="text-align:left;"><div class="modal-header" style="display:flex; justify-content:space-between; margin-bottom:20px;"><div class="modal-title" id="dayModalTitle">Дата</div><button class="close-modal" onclick="closeModal('dayModal')" style="background:none; border:none; font-size:24px; cursor:pointer;"><i class="ph ph-x"></i></button></div><div style="display:flex; gap:10px; margin-bottom:20px;"><input type="text" class="input-field" id="dayNoteInput" placeholder="Заметка..."><button class="auth-btn" style="padding:0 20px; width:auto;" onclick="addDayNote()">ОК</button></div><div class="event-list" id="dayEventsList" style="display:flex; flex-direction:column; gap:10px;"></div></div></div>
 <div class="modal-overlay" id="manageEventsModal"><div class="modal-content" style="text-align:left;"><div class="modal-header" style="display:flex; justify-content:space-between; margin-bottom:20px;"><div class="modal-title">Важные даты</div><button class="close-modal" onclick="closeModal('manageEventsModal')" style="background:none; border:none; font-size:24px; cursor:pointer;"><i class="ph ph-x"></i></button></div><input type="text" class="input-field" id="impEventTitle" placeholder="Название"><input type="date" class="input-field" id="impEventDate"><label style="display:flex; gap:10px; margin-bottom:15px; cursor:pointer;"><input type="checkbox" id="impEventRecurring" style="width:18px; height:18px;"> Повторять каждый год</label><button class="auth-btn" style="margin-bottom:20px;" onclick="addImportantEvent()">Добавить</button><div class="event-list" id="importantEventsList" style="display:flex; flex-direction:column; gap:10px;"></div></div></div>
 
@@ -338,12 +329,9 @@
 
     window.onerror = function(msg, url, line) { console.error("Глобальная ошибка:", msg, "в строке", line); };
 
-    // ==========================================
     // СКРЫТАЯ АДМИНКА
-    // ==========================================
     let clickCount = 0;
     let clickTimer;
-
     document.getElementById('mainLogo').addEventListener('click', () => {
         if (window.innerWidth < 1024) return;
         clickCount++;
@@ -383,9 +371,7 @@
         signOut(auth);
     }
 
-    // ==========================================
     // ОБЫЧНАЯ ЛОГИКА
-    // ==========================================
     window.toggleAuthMode = function() {
         isRegisterMode = !isRegisterMode;
         document.getElementById('authSubtitle').textContent = isRegisterMode ? 'Создание аккаунта' : 'Вход';
@@ -401,9 +387,7 @@
         const btn = document.getElementById('mainAuthBtn');
         err.style.display = 'none';
         btn.textContent = 'Загрузка...';
-
         const authAction = isRegisterMode ? createUserWithEmailAndPassword : signInWithEmailAndPassword;
-
         authAction(auth, email, pass).catch((error) => {
             btn.textContent = isRegisterMode ? 'Зарегистрироваться' : 'Войти';
             err.style.display = 'block';
@@ -418,22 +402,17 @@
 
     onAuthStateChanged(auth, async (user) => {
         if (isSecretAdminMode) return;
-
         if (user) {
             currentUserId = user.uid;
             document.getElementById('authScreen').style.display = 'none';
             document.getElementById('loadingText').style.display = 'block';
-            
             try {
                 await loadUserData(user.uid);
                 await loadPricing();
                 document.getElementById('loadingText').style.display = 'none';
                 checkSubscription();
-
                 setInterval(() => {
-                    if(currentUserId && !isSecretAdminMode) {
-                        updateDoc(doc(db, "users", currentUserId), { lastSeen: new Date().toISOString() }).catch(()=>{});
-                    }
+                    if(currentUserId && !isSecretAdminMode) updateDoc(doc(db, "users", currentUserId), { lastSeen: new Date().toISOString() }).catch(()=>{});
                 }, 60000);
             } catch(e) {
                 console.error("Ошибка при загрузке данных:", e);
@@ -443,8 +422,7 @@
                 document.getElementById('appContainer').style.display = 'none';
             }
         } else {
-            currentUserId = null;
-            currentUserData = null;
+            currentUserId = null; currentUserData = null;
             document.getElementById('authScreen').style.display = 'flex';
             document.getElementById('appContainer').style.display = 'none';
             document.getElementById('paymentScreen').style.display = 'none';
@@ -478,27 +456,18 @@
     function checkSubscription() {
         if (!currentUserData) return;
         const now = new Date();
-        if (currentUserData.isBlocked || now > new Date(currentUserData.subEndDate)) {
-            showPaymentScreen();
-        } else {
-            showApp();
-        }
+        if (currentUserData.isBlocked || now > new Date(currentUserData.subEndDate)) showPaymentScreen();
+        else showApp();
     }
 
     function showApp() {
         document.getElementById('paymentScreen').style.display = 'none';
         document.getElementById('appContainer').style.display = 'flex';
-        if (appData.settings.theme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            document.getElementById('themeBtn').innerHTML = '<i class="ph ph-sun"></i>';
-        }
+        if (appData.settings.theme === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); document.getElementById('themeBtn').innerHTML = '<i class="ph ph-sun"></i>'; }
         try { initApp(); } catch(e) { console.error("Ошибка initApp:", e); }
     }
 
-    function showPaymentScreen() {
-        document.getElementById('appContainer').style.display = 'none';
-        document.getElementById('paymentScreen').style.display = 'flex';
-    }
+    function showPaymentScreen() { document.getElementById('appContainer').style.display = 'none'; document.getElementById('paymentScreen').style.display = 'flex'; }
 
     let saveTimeout;
     function save() {
@@ -507,7 +476,6 @@
             if(document.getElementById('page-dashboard').classList.contains('active')) updateCharts();
             if(document.getElementById('page-planner').classList.contains('active')) renderMonthCalendar();
             if (!currentUserId || isSecretAdminMode) return;
-            
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(async () => {
                 try { await setDoc(doc(db, "users", currentUserId), { ...currentUserData, appData: appData }); } catch (e) { console.error("Save error:", e); }
@@ -518,9 +486,7 @@
     function renderPricingGrid() {
         const grid = document.getElementById('pricingGrid'); grid.innerHTML = '';
         pricingPlans.forEach(plan => {
-            const card = document.createElement('div');
-            card.className = 'tariff-card';
-            card.onclick = () => openTelegramPayment(plan);
+            const card = document.createElement('div'); card.className = 'tariff-card'; card.onclick = () => openTelegramPayment(plan);
             card.innerHTML = `<div class="tariff-name">${plan.name}</div><div class="tariff-price">${plan.price} ₽</div><div class="tariff-days">${plan.days} дн.</div>`;
             grid.appendChild(card);
         });
@@ -535,59 +501,25 @@
 
     window.closeModal = function(id) { document.getElementById(id).classList.remove('active'); }
 
-    // ==========================================
     // АДМИНКА
-    // ==========================================
     window.loadAdminData = async function() {
-        const tbody = document.querySelector('#adminUsersTable tbody');
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Загрузка...</td></tr>';
+        const tbody = document.querySelector('#adminUsersTable tbody'); tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Загрузка...</td></tr>';
         document.getElementById('adminSearch').value = '';
-
         try {
-            const paySnap = await getDocs(collection(db, "payments"));
-            let revenue = 0;
-            paySnap.forEach(d => revenue += d.data().amount);
+            const paySnap = await getDocs(collection(db, "payments")); let revenue = 0; paySnap.forEach(d => revenue += d.data().amount);
             document.getElementById('adminRevenue').textContent = revenue.toLocaleString('ru-RU') + ' ₽';
-
-            const querySnapshot = await getDocs(collection(db, "users"));
-            let totalUsers = 0;
-            let onlineUsers = 0;
-            const now = new Date();
-            
+            const querySnapshot = await getDocs(collection(db, "users")); let totalUsers = 0; let onlineUsers = 0; const now = new Date();
             tbody.innerHTML = '';
             querySnapshot.forEach((doc) => {
-                const u = doc.data(); const uid = doc.id;
-                if(u.email === MASTER_EMAIL) return;
-                
-                totalUsers++;
-                if (u.lastSeen && (now - new Date(u.lastSeen)) < 120000) onlineUsers++;
-
-                const isBlocked = u.isBlocked;
-                const subEnd = new Date(u.subEndDate).toLocaleDateString('ru-RU');
-                const isExpired = new Date(u.subEndDate) < new Date();
-                
-                let statusText = isBlocked ? '🚫 Заблок' : (isExpired ? '⌛ Истек' : '✅ Активен');
-                let statusColor = isBlocked ? 'var(--bad)' : (isExpired ? 'var(--warn)' : 'var(--good)');
-
+                const u = doc.data(); const uid = doc.id; if(u.email === MASTER_EMAIL) return;
+                totalUsers++; if (u.lastSeen && (now - new Date(u.lastSeen)) < 120000) onlineUsers++;
+                const isBlocked = u.isBlocked; const subEnd = new Date(u.subEndDate).toLocaleDateString('ru-RU'); const isExpired = new Date(u.subEndDate) < new Date();
+                let statusText = isBlocked ? '🚫 Заблок' : (isExpired ? '⌛ Истек' : '✅ Активен'); let statusColor = isBlocked ? 'var(--bad)' : (isExpired ? 'var(--warn)' : 'var(--good)');
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="user-email">${u.email}</td>
-                    <td style="color:${statusColor}; font-weight:600;">${statusText}</td>
-                    <td>${subEnd}</td>
-                    <td>
-                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 3)">💰 +3д</button>
-                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 7)">💰 +7д</button>
-                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 30)">💰 +30д</button>
-                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 365)">💰 +1г</button>
-                        <button class="admin-btn outline" style="color:${isBlocked ? 'var(--good)' : 'var(--bad)'}; border-color:${isBlocked ? 'var(--good)' : 'var(--bad)'}" onclick="adminToggleBlock('${uid}', ${isBlocked})">${isBlocked ? 'Разблок' : 'Блок'}</button>
-                    </td>
-                `;
+                tr.innerHTML = `<td class="user-email">${u.email}</td><td style="color:${statusColor}; font-weight:600;">${statusText}</td><td>${subEnd}</td><td><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 3)">💰 +3д</button><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 7)">💰 +7д</button><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 30)">💰 +30д</button><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 365)">💰 +1г</button><button class="admin-btn outline" style="color:${isBlocked ? 'var(--good)' : 'var(--bad)'}; border-color:${isBlocked ? 'var(--good)' : 'var(--bad)'}" onclick="adminToggleBlock('${uid}', ${isBlocked})">${isBlocked ? 'Разблок' : 'Блок'}</button></td>`;
                 tbody.appendChild(tr);
             });
-            
-            document.getElementById('adminTotalUsers').textContent = totalUsers;
-            document.getElementById('adminOnline').textContent = onlineUsers;
-
+            document.getElementById('adminTotalUsers').textContent = totalUsers; document.getElementById('adminOnline').textContent = onlineUsers;
         } catch(e) { console.error(e); tbody.innerHTML = '<tr><td colspan="4" style="color:red;">Ошибка (Проверьте Rules)</td></tr>'; }
     }
 
@@ -596,76 +528,40 @@
         const rows = document.querySelectorAll('#adminUsersTable tbody tr');
         rows.forEach(row => {
             const emailCell = row.querySelector('.user-email');
-            if (emailCell) {
-                if (emailCell.textContent.toLowerCase().includes(query)) row.style.display = '';
-                else row.style.display = 'none';
-            }
+            if (emailCell) { if (emailCell.textContent.toLowerCase().includes(query)) row.style.display = ''; else row.style.display = 'none'; }
         });
     }
 
-    window.openPaymentLogger = function(uid, days) {
-        document.getElementById('paymentUid').value = uid;
-        document.getElementById('paymentDays').value = days;
-        document.getElementById('paymentAmountInput').value = '';
-        document.getElementById('paymentLogModal').classList.add('active');
-    }
-
+    window.openPaymentLogger = function(uid, days) { document.getElementById('paymentUid').value = uid; document.getElementById('paymentDays').value = days; document.getElementById('paymentAmountInput').value = ''; document.getElementById('paymentLogModal').classList.add('active'); }
+    
     window.confirmPaymentLog = async function() {
-        const uid = document.getElementById('paymentUid').value;
-        const days = Number(document.getElementById('paymentDays').value);
-        const amount = Number(document.getElementById('paymentAmountInput').value);
-        
+        const uid = document.getElementById('paymentUid').value; const days = Number(document.getElementById('paymentDays').value); const amount = Number(document.getElementById('paymentAmountInput').value);
         if (!amount || amount <= 0) return alert('Введите корректную сумму');
-
         try {
-            const userRef = doc(db, "users", uid);
-            const userSnap = await getDoc(userRef);
-            const userData = userSnap.data();
-            
+            const userRef = doc(db, "users", uid); const userSnap = await getDoc(userRef); const userData = userSnap.data();
             await addDoc(collection(db, "payments"), { uid: uid, email: userData.email, amount: amount, date: new Date().toISOString(), days: days });
-
-            let currentEnd = new Date(userData.subEndDate);
-            let now = new Date();
-            let startFrom = currentEnd > now ? currentEnd : now;
-            let newEnd = new Date(startFrom.getTime() + days * 24 * 60 * 60 * 1000);
-            
+            let currentEnd = new Date(userData.subEndDate); let now = new Date(); let startFrom = currentEnd > now ? currentEnd : now; let newEnd = new Date(startFrom.getTime() + days * 24 * 60 * 60 * 1000);
             await updateDoc(userRef, { subEndDate: newEnd.toISOString(), isBlocked: false });
-            
-            closeModal('paymentLogModal');
-            loadAdminData();
+            closeModal('paymentLogModal'); loadAdminData();
         } catch(e) { alert("Ошибка: " + e.message); }
     }
 
-    window.adminToggleBlock = async function(uid, currentStatus) {
-        try { await updateDoc(doc(db, "users", uid), { isBlocked: !currentStatus }); loadAdminData(); } catch(e) {}
-    }
+    window.adminToggleBlock = async function(uid, currentStatus) { try { await updateDoc(doc(db, "users", uid), { isBlocked: !currentStatus }); loadAdminData(); } catch(e) {} }
 
     window.renderAdminPricing = function() {
         const container = document.getElementById('pricingSettings'); container.innerHTML = '';
         pricingPlans.forEach((plan, idx) => {
-            container.innerHTML += `
-                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
-                    <input type="text" class="input-field" value="${plan.name}" id="pname-${idx}" placeholder="Название">
-                    <input type="number" class="input-field" value="${plan.days}" id="pdays-${idx}" placeholder="Дней">
-                    <input type="number" class="input-field" value="${plan.price}" id="pprice-${idx}" placeholder="Цена (₽)">
-                </div>`;
+            container.innerHTML += `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;"><input type="text" class="input-field" value="${plan.name}" id="pname-${idx}" placeholder="Название"><input type="number" class="input-field" value="${plan.days}" id="pdays-${idx}" placeholder="Дней"><input type="number" class="input-field" value="${plan.price}" id="pprice-${idx}" placeholder="Цена (₽)"></div>`;
         });
     }
 
     window.savePricingSettings = async function() {
         let newPlans = [];
-        pricingPlans.forEach((plan, idx) => {
-            newPlans.push({ id: plan.id, name: document.getElementById(`pname-${idx}`).value, days: Number(document.getElementById(`pdays-${idx}`).value), price: Number(document.getElementById(`pprice-${idx}`).value) });
-        });
-        try {
-            await setDoc(doc(db, "settings", "pricing"), { plans: newPlans });
-            pricingPlans = newPlans;
-            alert("Тарифы обновлены!");
-            renderPricingGrid();
-        } catch(e) { alert("Ошибка: " + e.message); }
+        pricingPlans.forEach((plan, idx) => { newPlans.push({ id: plan.id, name: document.getElementById(`pname-${idx}`).value, days: Number(document.getElementById(`pdays-${idx}`).value), price: Number(document.getElementById(`pprice-${idx}`).value) }); });
+        try { await setDoc(doc(db, "settings", "pricing"), { plans: newPlans }); pricingPlans = newPlans; alert("Тарифы обновлены!"); renderPricingGrid(); } catch(e) { alert("Ошибка: " + e.message); }
     }
 
-    // --- ЛОГИКА ПЛАНЕРА ---
+    // ЛОГИКА ПЛАНЕРА
     const emojis = { sleep: '😴', energy: '🔋', mood: '🤩', water: '💧', food: '🍏', sport: '🏋️' };
     function initApp() {
         ['sleep', 'energy', 'mood', 'water', 'food', 'sport'].forEach(metric => {
@@ -683,8 +579,7 @@
     }
 
     window.switchPage = function(pageId, btn) {
-        document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(el => el.classList.remove('active')); document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
         document.getElementById('page-' + pageId).classList.add('active'); btn.classList.add('active');
         if(pageId === 'dashboard') { updateDashboardStats(); setTimeout(() => updateCharts(), 50); }
         if(pageId === 'health') { loadHealthData(); renderThoughts(); }
@@ -697,6 +592,17 @@
         else { root.setAttribute('data-theme', 'dark'); appData.settings.theme = 'dark'; document.getElementById('themeBtn').innerHTML = '<i class="ph ph-sun"></i>'; }
         save();
     };
+
+    // СВОРАЧИВАНИЕ КАЛЕНДАРЯ
+    window.toggleCalendar = function() {
+        const wrapper = document.getElementById('calendarWrapper');
+        const btn = document.getElementById('calToggleBtn');
+        wrapper.classList.toggle('collapsed');
+        btn.classList.toggle('collapsed');
+        // Меняем иконку
+        if(wrapper.classList.contains('collapsed')) btn.innerHTML = '<i class="ph ph-caret-down"></i>';
+        else btn.innerHTML = '<i class="ph ph-caret-up"></i>';
+    }
 
     let currentDate = new Date(); let currentWeekStart = getMonday(new Date()); let activeModalDate = ''; 
     function getMonday(d) { d = new Date(d); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); return new Date(d.setDate(diff)); }
@@ -732,7 +638,12 @@
         const list = document.getElementById('dayEventsList'); list.innerHTML = '';
         const dayTasks = appData.tasks[activeModalDate] || []; const notes = appData.dayNotes[activeModalDate] || [];
         if (notes.length === 0 && dayTasks.length === 0) { list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:13px; padding:20px 0;">Нет записей</div>'; return; }
-        notes.forEach(note => { const div = document.createElement('div'); div.className = 'event-item'; div.style = "display:flex; justify-content:space-between; padding:10px; background:var(--surface-soft); border-radius:8px;"; div.innerHTML = `<span>${note.text}</span><div style="display:flex; gap:10px;"><button style="background:none; border:none; cursor:pointer; color:var(--accent);" onclick="convertNoteToTask('${note.id}')"><i class="ph ph-arrow-right"></i></button><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteDayItem('${note.id}', 'note')"><i class="ph ph-trash"></i></button></div>`; list.appendChild(div); });
+        notes.forEach(note => { 
+            const div = document.createElement('div'); div.className = 'event-item'; div.style = "display:flex; justify-content:space-between; padding:10px; background:var(--surface-soft); border-radius:8px;"; 
+            // ВОЗВРАЩЕН ТЕКСТ "СДЕЛАТЬ ЗАДАЧЕЙ"
+            div.innerHTML = `<span>${note.text}</span><div style="display:flex; gap:10px;"><button class="btn-convert" onclick="convertNoteToTask('${note.id}')"><i class="ph ph-arrow-right"></i> Сделать задачей</button><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteDayItem('${note.id}', 'note')"><i class="ph ph-trash"></i></button></div>`; 
+            list.appendChild(div); 
+        });
         dayTasks.forEach(task => { const div = document.createElement('div'); div.className = 'event-item'; div.style = "display:flex; justify-content:space-between; padding:10px; background:var(--surface-soft); border-radius:8px;"; div.innerHTML = `<div style="display:flex; gap:10px; align-items:center;"><input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTaskStatus('${task.id}')"><span style="${task.done ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${task.text}</span></div><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteDayItem('${task.id}', 'task')"><i class="ph ph-trash"></i></button>`; list.appendChild(div); });
     }
 
@@ -767,63 +678,74 @@
     window.saveTaskNote = function(dateStr, idx, val) { appData.tasks[dateStr][idx].note = val; save(); }
     window.saveNoteHeight = function(dateStr, idx, height) { appData.tasks[dateStr][idx].noteHeight = height; save(); }
 
-    // --- ПРИВЫЧКИ ---
+    // ПРИВЫЧКИ
     window.renderHabits = function() {
         const list = document.getElementById('habitsList'); const header = document.getElementById('habitDatesHeader');
         if(!list || !header) return;
-        
-        header.innerHTML = '';
-        const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-        
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(currentWeekStart);
-            d.setDate(d.getDate() + i);
-            header.innerHTML += `<div class="h-day-label">${days[i]}<br><span style="font-size:11px;font-weight:400;opacity:0.6;">${d.getDate()}</span></div>`;
-        }
-
+        header.innerHTML = ''; const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        for (let i = 0; i < 7; i++) { const d = new Date(currentWeekStart); d.setDate(d.getDate() + i); header.innerHTML += `<div class="h-day-label">${days[i]}<br><span style="font-size:11px;font-weight:400;opacity:0.6;">${d.getDate()}</span></div>`; }
         list.innerHTML = '';
         appData.habits.forEach(h => {
             const row = document.createElement('div'); row.className = 'habit-row';
-            const nameInput = document.createElement('input'); nameInput.className = 'habit-name'; nameInput.value = h.name;
-            nameInput.onchange = (e) => { h.name = e.target.value; save(); };
-            
+            const nameInput = document.createElement('input'); nameInput.className = 'habit-name'; nameInput.value = h.name; nameInput.onchange = (e) => { h.name = e.target.value; save(); };
             const checksDiv = document.createElement('div'); checksDiv.className = 'habit-days';
-            
-            for (let i = 0; i < 7; i++) {
-                const d = new Date(currentWeekStart); d.setDate(d.getDate() + i);
-                const dateStr = getFormattedDate(d);
-                const isDone = h.history.includes(dateStr);
-                const check = document.createElement('div');
-                check.className = `h-check ${isDone ? 'checked' : ''}`;
-                check.innerHTML = '<i class="ph ph-check"></i>';
-                check.onclick = () => toggleHabit(h.id, dateStr);
-                checksDiv.appendChild(check);
-            }
-
-            const delBtn = document.createElement('button'); delBtn.className = 'h-del'; delBtn.innerHTML = '<i class="ph ph-x"></i>';
-            delBtn.onclick = () => { appData.habits = appData.habits.filter(x => x.id !== h.id); save(); renderHabits(); };
-            
+            for (let i = 0; i < 7; i++) { const d = new Date(currentWeekStart); d.setDate(d.getDate() + i); const dateStr = getFormattedDate(d); const isDone = h.history.includes(dateStr); const check = document.createElement('div'); check.className = `h-check ${isDone ? 'checked' : ''}`; check.innerHTML = '<i class="ph ph-check"></i>'; check.onclick = () => toggleHabit(h.id, dateStr); checksDiv.appendChild(check); }
+            const delBtn = document.createElement('button'); delBtn.className = 'h-del'; delBtn.innerHTML = '<i class="ph ph-x"></i>'; delBtn.onclick = () => { appData.habits = appData.habits.filter(x => x.id !== h.id); save(); renderHabits(); };
             row.appendChild(nameInput); row.appendChild(checksDiv); row.appendChild(delBtn); list.appendChild(row);
         });
     }
 
-    window.toggleHabit = function(id, dateStr) {
-        const habit = appData.habits.find(h => h.id === id);
-        const idx = habit.history.indexOf(dateStr);
-        if (idx > -1) habit.history.splice(idx, 1);
-        else habit.history.push(dateStr);
-        save(); renderHabits();
-    }
+    window.toggleHabit = function(id, dateStr) { const habit = appData.habits.find(h => h.id === id); const idx = habit.history.indexOf(dateStr); if (idx > -1) habit.history.splice(idx, 1); else habit.history.push(dateStr); save(); renderHabits(); }
+    window.addHabit = function() { appData.habits.push({ id: Date.now().toString(), name: 'Новый ритуал', history: [] }); save(); renderHabits(); }
 
-    window.addHabit = function() {
-        appData.habits.push({ id: Date.now().toString(), name: 'Новый ритуал', history: [] });
-        save(); renderHabits();
-    }
-
+    // ЗДОРОВЬЕ И ИИ
     window.setRating = function(metric, value) { const today = getFormattedDate(new Date()); if (!appData.health[today]) appData.health[today] = { sleep: 0, energy: 0, mood: 0, water: 0, food: 0, sport: 0 }; const h = appData.health[today]; h[metric] = (h[metric] === value) ? 0 : value; save(); loadHealthData(); }
-    function loadHealthData() { const today = getFormattedDate(new Date()); if (!appData.health[today]) appData.health[today] = { sleep: 0, energy: 0, mood: 0, water: 0, food: 0, sport: 0 }; const h = appData.health[today]; document.getElementById('vSleep').textContent = h.sleep + ' / 10'; document.getElementById('vEnergy').textContent = h.energy + ' / 10'; document.getElementById('vMood').textContent = h.mood + ' / 10'; document.getElementById('vWater').textContent = h.water + ' / 10'; document.getElementById('vFood').textContent = h.food + ' / 10'; document.getElementById('vSport').textContent = h.sport + ' / 10'; document.querySelectorAll('.rating-item').forEach(el => el.classList.remove('active')); ['sleep', 'energy', 'mood', 'water', 'food', 'sport'].forEach(metric => { const scale = document.getElementById('rs' + metric.charAt(0).toUpperCase() + metric.slice(1)); const items = scale.querySelectorAll('.rating-item'); for (let i = 0; i < h[metric]; i++) { if(items[i]) items[i].classList.add('active'); } }); updateHealthAI(h); }
+    
+    function loadHealthData() { 
+        const today = getFormattedDate(new Date()); if (!appData.health[today]) appData.health[today] = { sleep: 0, energy: 0, mood: 0, water: 0, food: 0, sport: 0 }; 
+        const h = appData.health[today]; 
+        document.getElementById('vSleep').textContent = h.sleep + ' / 10'; document.getElementById('vEnergy').textContent = h.energy + ' / 10'; document.getElementById('vMood').textContent = h.mood + ' / 10'; document.getElementById('vWater').textContent = h.water + ' / 10'; document.getElementById('vFood').textContent = h.food + ' / 10'; document.getElementById('vSport').textContent = h.sport + ' / 10'; 
+        document.querySelectorAll('.rating-item').forEach(el => el.classList.remove('active')); 
+        ['sleep', 'energy', 'mood', 'water', 'food', 'sport'].forEach(metric => { const scale = document.getElementById('rs' + metric.charAt(0).toUpperCase() + metric.slice(1)); const items = scale.querySelectorAll('.rating-item'); for (let i = 0; i < h[metric]; i++) { if(items[i]) items[i].classList.add('active'); } }); 
+        updateHealthAI(h); 
+    }
 
-    function updateHealthAI(h) { let paragraphs = []; const isSleepBad = h.sleep > 0 && h.sleep <= 4; const isSleepGood = h.sleep >= 7; const isEnergyBad = h.energy > 0 && h.energy <= 4; const isWaterBad = h.water > 0 && h.water <= 4; const isFoodBad = h.food > 0 && h.food <= 4; const isSportGood = h.sport >= 7; if (h.sleep === 0 && h.energy === 0) { document.getElementById('healthAdviceText').innerHTML = "Привет! Отметь показатели слева, чтобы я проанализировал твой день."; return; } paragraphs.push("Привет! Давай посмотрим на твое состояние сегодня."); if (isSleepBad) paragraphs.push(`🚨 <b>Внимание на сон.</b> Ты спал мало. Когнитивные способности снижены, отложи сложные задачи.`); else if (isSleepGood) paragraphs.push(`✅ <b>Отличный сон!</b> Идеальное время для важных дел.`); if (isEnergyBad) paragraphs.push(`🔋 <b>Низкая энергия.</b> Не работай через силу. Сделай разминку или выпей чаю.`); if (isFoodBad && isSportGood) paragraphs.push(`🍔 <b>Дисбаланс питания и нагрузок.</b> Тяжелая пища при тренировке вызовет сонливость.`); else if (isSportGood) paragraphs.push(`🏋️ <b>Отличная тренировка!</b> Не забудь восполнить водный баланс.`); if (isWaterBad) paragraphs.push(`💧 <b>Мало воды.</b> Выпей стакан прямо сейчас.`); if (h.sleep <= 5 && isSportGood) paragraphs.push(`⚠️ <b>Переутомление:</b> Тренировка при недосыпе — стресс. Ляг пораньше.`); paragraphs.push("Береги себя!"); document.getElementById('healthAdviceText').innerHTML = paragraphs.map(p => `<p>${p}</p>`).join(''); }
+    // ИСПРАВЛЕННЫЙ ИИ (теперь пишет советы даже для средних значений)
+    function updateHealthAI(h) { 
+        let paragraphs = []; 
+        const isSleepBad = h.sleep > 0 && h.sleep <= 4; 
+        const isSleepGood = h.sleep >= 7; 
+        const isEnergyBad = h.energy > 0 && h.energy <= 4; 
+        const isWaterBad = h.water > 0 && h.water <= 4; 
+        const isFoodBad = h.food > 0 && h.food <= 4; 
+        const isSportGood = h.sport >= 7; 
+        
+        if (h.sleep === 0 && h.energy === 0) { 
+            document.getElementById('healthAdviceText').innerHTML = "Привет! Отметь показатели слева, чтобы я проанализировал твой день."; 
+            return; 
+        } 
+        
+        paragraphs.push("Привет! Давай посмотрим на твое состояние сегодня."); 
+        
+        if (isSleepBad) paragraphs.push(`🚨 <b>Внимание на сон.</b> Ты спал мало. Когнитивные способности снижены, отложи сложные задачи.`); 
+        else if (isSleepGood) paragraphs.push(`✅ <b>Отличный сон!</b> Идеальное время для важных дел.`); 
+        else if (h.sleep > 0) paragraphs.push(`😴 <b>Сон средний.</b> Энергии должно хватить, но следи за перерывами.`); // Добавлено среднее значение
+        
+        if (isEnergyBad) paragraphs.push(`🔋 <b>Низкая энергия.</b> Не работай через силу. Сделай разминку или выпей чаю.`); 
+        else if (h.energy >= 7) paragraphs.push(`🔥 <b>Много энергии!</b> Отличный день, чтобы сделать самые сложные дела.`); // Добавлено хорошее значение
+        
+        if (isFoodBad && isSportGood) paragraphs.push(`🍔 <b>Дисбаланс питания и нагрузок.</b> Тяжелая пища при тренировке вызовет сонливость.`); 
+        else if (isSportGood) paragraphs.push(`🏋️ <b>Отличная тренировка!</b> Не забудь восполнить водный баланс.`); 
+        else if (h.sport > 0 && h.sport <= 3) paragraphs.push(`🛋️ <b>Мало движения.</b> Постарайся хотя бы 15 минут погулять перед сном.`); // Добавлено
+        
+        if (isWaterBad) paragraphs.push(`💧 <b>Мало воды.</b> Выпей стакан прямо сейчас.`); 
+        else if (h.water >= 7) paragraphs.push(`💧 <b>Отличный водный баланс.</b> Так держать!`); // Добавлено
+        
+        if (h.sleep <= 5 && isSportGood) paragraphs.push(`⚠️ <b>Переутомление:</b> Тренировка при недосыпе — стресс. Ляг пораньше.`); 
+        
+        paragraphs.push("Береги себя!"); 
+        document.getElementById('healthAdviceText').innerHTML = paragraphs.map(p => `<p>${p}</p>`).join(''); 
+    }
 
     window.saveThought = function() { const input = document.getElementById('thoughtInput'); const text = input.value.trim(); if (!text) return; appData.mindstream.push({ id: Date.now().toString(), timestamp: new Date().toISOString(), text: text }); input.value = ''; save(); renderThoughts(); }
     function renderThoughts() { const list = document.getElementById('thoughtsList'); list.innerHTML = ''; if (appData.mindstream.length === 0) { list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:13px;">Хроника пуста</div>'; return; } const sorted = [...appData.mindstream].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); sorted.forEach(t => { const card = document.createElement('div'); card.className = 'thought-card'; const d = new Date(t.timestamp); card.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span class="thought-date">${d.toLocaleDateString('ru-RU')} ${d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}</span><button style="background:none; border:none; color:var(--bad); cursor:pointer;" onclick="deleteThought('${t.id}')"><i class="ph ph-trash"></i></button></div><div class="thought-text">${t.text}</div>`; list.appendChild(card); }); }
