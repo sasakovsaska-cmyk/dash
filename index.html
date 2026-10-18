@@ -91,6 +91,27 @@
         .t-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 6px; margin-top: 4px; }
         .task-note-input { width: 100%; padding: 8px; font-size: 13px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 6px; resize: vertical; outline: none; margin-top: 6px; font-family: inherit; }
 
+        /* ИСПРАВЛЕНА КНОПКА СДЕЛАТЬ ЗАДАЧЕЙ */
+        .btn-convert {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: 0.2s;
+            font-weight: 500;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .btn-convert:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
         .habits-header { display: grid; grid-template-columns: 1fr auto 24px; gap: 16px; align-items: center; margin-bottom: 16px; padding: 0 16px; }
         .h-days { display: grid; grid-template-columns: repeat(7, 36px); gap: 10px; }
         .h-day-label { width: 36px; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); }
@@ -245,7 +266,10 @@
                     <button class="icon-btn" style="width:28px; height:28px; box-shadow:none; border:none;" onclick="changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
                     <span id="monthTitle" style="font-size:15px; font-weight:600;">Месяц</span>
                     <button class="icon-btn" style="width:28px; height:28px; box-shadow:none; border:none;" onclick="changeMonth(1)"><i class="ph ph-caret-right"></i></button>
-                    <button class="icon-btn" id="calToggleBtn" onclick="toggleCalendar()" title="Свернуть/Развернуть" style="margin-left:10px;"><i class="ph ph-caret-up"></i></button>
+                    
+                    <button class="btn-submit" style="padding: 6px 12px; font-size:12px; border-radius:8px; margin-left:10px; background:var(--accent); color:white; border:none; cursor:pointer;" onclick="openManageEventsModal()">Важные даты</button>
+                    
+                    <button class="icon-btn" id="calToggleBtn" onclick="toggleCalendar()" title="Свернуть/Развернуть"><i class="ph ph-caret-up"></i></button>
                 </div>
             </div>
             <div class="calendar-wrapper" id="calendarWrapper"><div class="month-calendar" id="monthCalendarGrid"></div></div>
@@ -500,7 +524,6 @@
         document.getElementById('paymentScreen').style.display = 'flex';
     }
 
-    // ИСПРАВЛЕННАЯ ФУНКЦИЯ СОХРАНЕНИЯ (Убран вызов несуществующей функции)
     async function save() {
         if (!currentUserId || isSecretAdminMode) return;
         try {
@@ -746,7 +769,7 @@
         if (notes.length === 0 && dayTasks.length === 0) { list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:13px; padding:20px 0;">Нет записей</div>'; return; }
         notes.forEach(note => { 
             const div = document.createElement('div'); div.className = 'event-item'; div.style = "display:flex; justify-content:space-between; padding:10px; background:var(--surface-soft); border-radius:8px;"; 
-            div.innerHTML = `<span>${note.text}</span><div style="display:flex; gap:10px;"><button class="btn-convert" onclick="convertNoteToTask('${note.id}')"><i class="ph ph-arrow-right"></i> Сделать задачей</button><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteDayItem('${note.id}', 'note')"><i class="ph ph-trash"></i></button></div>`; 
+            div.innerHTML = `<span>${note.text}</span><div style="display:flex; gap:10px; align-items:center;"><button class="btn-convert" onclick="convertNoteToTask('${note.id}')"><i class="ph ph-arrow-right"></i> Сделать задачей</button><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteDayItem('${note.id}', 'note')"><i class="ph ph-trash"></i></button></div>`; 
             list.appendChild(div); 
         });
         dayTasks.forEach(task => { const div = document.createElement('div'); div.className = 'event-item'; div.style = "display:flex; justify-content:space-between; padding:10px; background:var(--surface-soft); border-radius:8px;"; div.innerHTML = `<div style="display:flex; gap:10px; align-items:center;"><input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTaskStatus('${task.id}')"><span style="${task.done ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${task.text}</span></div><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteDayItem('${task.id}', 'task')"><i class="ph ph-trash"></i></button>`; list.appendChild(div); });
@@ -756,6 +779,37 @@
     window.convertNoteToTask = function(id) { const notes = appData.dayNotes[activeModalDate]; const noteIdx = notes.findIndex(n => n.id === id); if (noteIdx > -1) { const note = notes.splice(noteIdx, 1)[0]; if (!appData.tasks[activeModalDate]) appData.tasks[activeModalDate] = []; appData.tasks[activeModalDate].push({ id: note.id, text: note.text, done: false, note: '', noteHeight: '60px' }); save(); renderDayModalList(); renderPlanner(); } }
     window.toggleTaskStatus = function(id) { const task = appData.tasks[activeModalDate].find(t => t.id === id); if (task) { task.done = !task.done; save(); renderDayModalList(); renderPlanner(); } }
     window.deleteDayItem = function(id, source) { if (source === 'note') appData.dayNotes[activeModalDate] = appData.dayNotes[activeModalDate].filter(n => n.id !== id); else appData.tasks[activeModalDate] = appData.tasks[activeModalDate].filter(t => t.id !== id); save(); renderDayModalList(); renderPlanner(); }
+
+    // ВАЖНЫЕ ДАТЫ
+    window.openManageEventsModal = function() { renderImportantEventsList(); document.getElementById('manageEventsModal').classList.add('active'); }
+    function renderImportantEventsList() {
+        const list = document.getElementById('importantEventsList'); list.innerHTML = '';
+        if (appData.importantEvents.length === 0) { list.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:13px;">Список пуст</div>'; return; }
+        appData.importantEvents.sort((a,b) => a.date.localeCompare(b.date));
+        appData.importantEvents.forEach(ev => {
+            const div = document.createElement('div');
+            div.style = "display:flex; justify-content:space-between; padding:10px; background:var(--surface-soft); border-radius:8px;";
+            let displayDate = ev.date;
+            if (ev.recurring) { const parts = ev.date.split('-'); displayDate = `${parts[1]}.${parts[0]} (Ежегодно)`; }
+            else { displayDate = new Date(ev.date).toLocaleDateString('ru-RU'); }
+            div.innerHTML = `<div><div style="font-weight:600; font-size:14px;">${ev.title}</div><div style="font-size:11px; color:var(--text-muted);">${displayDate}</div></div><button style="background:none; border:none; cursor:pointer; color:var(--bad);" onclick="deleteImportantEvent('${ev.id}')"><i class="ph ph-trash"></i></button>`;
+            list.appendChild(div);
+        });
+    }
+    window.addImportantEvent = function() {
+        const title = document.getElementById('impEventTitle').value.trim();
+        const dateVal = document.getElementById('impEventDate').value;
+        const recurring = document.getElementById('impEventRecurring').checked;
+        if (!title || !dateVal) return alert('Заполните название и дату');
+        const saveDate = recurring ? dateVal.slice(5) : dateVal;
+        appData.importantEvents.push({ id: Date.now().toString(), title, date: saveDate, recurring });
+        document.getElementById('impEventTitle').value = ''; document.getElementById('impEventDate').value = ''; document.getElementById('impEventRecurring').checked = false;
+        save(); renderImportantEventsList(); renderMonthCalendar();
+    }
+    window.deleteImportantEvent = function(id) {
+        appData.importantEvents = appData.importantEvents.filter(ev => ev.id !== id);
+        save(); renderImportantEventsList(); renderMonthCalendar();
+    }
 
     let openNotes = new Set(); 
     function renderPlanner() {
@@ -864,7 +918,7 @@
         if (chartTasks) chartTasks.destroy(); chartTasks = new ApexCharts(document.querySelector("#chartTasks"), optTasks); chartTasks.render();
         const sleepData = [], energyData = [];
         for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); const h = appData.health[getFormattedDate(d)] || { sleep: 0, energy: 0 }; sleepData.push(h.sleep); energyData.push(h.energy); }
-        const optHealth = { series: [{ name: 'Сон', data: sleepData }, { name: 'Энергия', data: energyData }], chart: { type: 'area', height: 260, toolbar: { show: false }, fontFamily: 'DM Sans' }, colors: ['#7B9C83', '#D4A373'], fill: { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.05 } }, stroke: { curve: 'smooth', width: 3 }, xaxis: { categories: dates, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, yaxis: { max: 10, min: 0, tickAmount: 5, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, grid: { borderColor: isDark ? '#383431' : '#EBE6DD', strokeDashArray: 4 }, theme: { mode: isDark ? 'dark' : 'light' }, legend: { labels: { colors: isDark ? '#F0ECE6' : '#2C2C29' } } };
+        const optHealth = { series: [{ name: 'Сон', data: sleepData }, { name: 'Энергия', data: energyData }], chart: { type: 'area', height: 260, toolbar: { show: false }, fontFamily: 'DM Sans' }, colors: ['#7B9C83', '#D4A373'], fill: { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.05 } }, stroke: { curve: 'smooth', width: 3 }, xaxis: { categories: dates, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, yaxis: { max: 10, min: 0, tickAmount: 5, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, grid: { borderColor: isDark ? '#383431' : '#EBE6DD', strokeDashArray: 4 }, theme: { mode: isDark ? 'dark' : 'light' }, legend: { labels: { colors: isDark ? '#F0ECE6' : '#2C2A29' } } };
         if (chartHealth) chartHealth.destroy(); chartHealth = new ApexCharts(document.querySelector("#chartHealth"), optHealth); chartHealth.render();
     }
 </script>
