@@ -318,7 +318,6 @@
     let isRegisterMode = false;
     let isSecretAdminMode = false;
 
-    // Изначально пустые данные
     let appData = { settings: { theme: 'light' }, tasks: {}, health: {}, mindstream: [], habits: [], dayNotes: {}, importantEvents: [] };
     let pricingPlans = [
         { id: 'p1', name: '3 дня', days: 3, price: 99 },
@@ -329,7 +328,7 @@
 
     window.onerror = function(msg, url, line) { console.error("Ошибка JS:", msg, "в строке", line); };
 
-    // --- СКРЫТАЯ АДМИНКА ---
+    // СКРЫТАЯ АДМИНКА
     let clickCount = 0;
     let clickTimer;
     document.getElementById('mainLogo').addEventListener('click', () => {
@@ -371,7 +370,7 @@
         signOut(auth);
     }
 
-    // --- АВТОРИЗАЦИЯ ---
+    // АВТОРИЗАЦИЯ
     window.toggleAuthMode = function() {
         isRegisterMode = !isRegisterMode;
         document.getElementById('authSubtitle').textContent = isRegisterMode ? 'Создание аккаунта' : 'Вход в облачный планер';
@@ -414,17 +413,11 @@
             document.getElementById('loadingText').style.display = 'block';
             
             try {
-                // 1. Загружаем данные из Firebase (или создаем новые)
                 await loadUserData(user.uid);
-                // 2. Загружаем тарифы
                 await loadPricing();
-                
                 document.getElementById('loadingText').style.display = 'none';
-                
-                // 3. Проверяем подписку и пускаем/блокируем
                 checkSubscription();
                 
-                // 4. Отправляем "пульс" онлайна
                 setInterval(() => {
                     if(currentUserId && !isSecretAdminMode) {
                         updateDoc(doc(db, "users", currentUserId), { lastSeen: new Date().toISOString() }).catch(()=>{});
@@ -447,27 +440,24 @@
         }
     });
 
-    // Загрузка данных пользователя из Firestore
     async function loadUserData(uid) {
         const docRef = doc(db, "users", uid);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
             currentUserData = docSnap.data();
-            // Если структура appData битая, восстанавливаем базовую
             if (currentUserData.appData) {
                 appData = { ...appData, ...currentUserData.appData };
             }
         } else {
-            // Если документа нет, создаем новый с пробным периодом 7 дней
             const now = new Date();
             const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
             currentUserData = {
                 email: auth.currentUser.email,
                 createdAt: now.toISOString(),
-                subEndDate: trialEnd.toISOString(), // Конец подписки
-                isBlocked: false, // Ручная блокировка
-                appData: appData, // Пустые задачи
+                subEndDate: trialEnd.toISOString(),
+                isBlocked: false,
+                appData: appData,
                 lastSeen: now.toISOString()
             };
             await setDoc(docRef, currentUserData);
@@ -483,13 +473,11 @@
         } catch (e) { console.error("Ошибка тарифов:", e); }
     }
 
-    // Проверка: истекла ли подписка или заблокирован ли юзер
     function checkSubscription() {
         if (!currentUserData) return;
         const now = new Date();
         const subEnd = new Date(currentUserData.subEndDate);
         
-        // Если заблокирован админом ИЛИ время вышло
         if (currentUserData.isBlocked || now > subEnd) {
             showPaymentScreen();
         } else {
@@ -512,28 +500,25 @@
         document.getElementById('paymentScreen').style.display = 'flex';
     }
 
-    // --- СОХРАНЕНИЕ ДАННЫХ (ЖЕЛЕЗНОЕ) ---
+    // ИСПРАВЛЕННАЯ ФУНКЦИЯ СОХРАНЕНИЯ (Убран вызов несуществующей функции)
     async function save() {
         if (!currentUserId || isSecretAdminMode) return;
         try {
-            // Обновляем UI локально, чтобы не было задержек
-            updateAI(); updateDashboardStats();
+            updateDashboardStats();
             if(document.getElementById('page-dashboard').classList.contains('active')) updateCharts();
             if(document.getElementById('page-planner').classList.contains('active')) renderMonthCalendar();
 
-            // Пишем в Firebase
             await setDoc(doc(db, "users", currentUserId), { 
                 ...currentUserData, 
                 appData: appData 
             });
-            console.log("Сохранено в Firebase успешно");
+            console.log("Сохранено успешно");
         } catch (e) {
             console.error("Ошибка сохранения:", e);
-            alert("ВНИМАНИЕ! Не удалось сохранить данные в базу. Проверьте правила (Rules) в Firebase.\n\nКод ошибки: " + e.code);
+            alert("ВНИМАНИЕ! Не удалось сохранить данные. Проверьте правила (Rules) в Firebase.\n\nКод ошибки: " + e.code);
         }
     }
 
-    // --- ОТРИСОВКА ТАРИФОВ И ОПЛАТЫ ---
     function renderPricingGrid() {
         const grid = document.getElementById('pricingGrid'); grid.innerHTML = '';
         pricingPlans.forEach(plan => {
@@ -552,7 +537,7 @@
 
     window.closeModal = function(id) { document.getElementById(id).classList.remove('active'); }
 
-    // --- АДМИН-ПАНЕЛЬ ---
+    // АДМИНКА
     window.loadAdminData = async function() {
         const tbody = document.querySelector('#adminUsersTable tbody'); 
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Загрузка...</td></tr>';
@@ -635,10 +620,8 @@
             const userSnap = await getDoc(userRef); 
             const userData = userSnap.data();
             
-            // Записываем транзакцию
             await addDoc(collection(db, "payments"), { uid: uid, email: userData.email, amount: amount, date: new Date().toISOString(), days: days });
             
-            // Продлеваем подписку
             let currentEnd = new Date(userData.subEndDate); 
             let now = new Date(); 
             let startFrom = currentEnd > now ? currentEnd : now; 
@@ -680,7 +663,7 @@
         } catch(e) { alert("Ошибка: " + e.message); }
     }
 
-    // --- ЛОГИКА ПЛАНЕРА ---
+    // ЛОГИКА ПЛАНЕРА
     const emojis = { sleep: '😴', energy: '🔋', mood: '🤩', water: '💧', food: '🍏', sport: '🏋️' };
     
     function initApp() {
@@ -881,7 +864,7 @@
         if (chartTasks) chartTasks.destroy(); chartTasks = new ApexCharts(document.querySelector("#chartTasks"), optTasks); chartTasks.render();
         const sleepData = [], energyData = [];
         for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); const h = appData.health[getFormattedDate(d)] || { sleep: 0, energy: 0 }; sleepData.push(h.sleep); energyData.push(h.energy); }
-        const optHealth = { series: [{ name: 'Сон', data: sleepData }, { name: 'Энергия', data: energyData }], chart: { type: 'area', height: 260, toolbar: { show: false }, fontFamily: 'DM Sans' }, colors: ['#7B9C83', '#D4A373'], fill: { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.05 } }, stroke: { curve: 'smooth', width: 3 }, xaxis: { categories: dates, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, yaxis: { max: 10, min: 0, tickAmount: 5, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, grid: { borderColor: isDark ? '#383431' : '#EBE6DD', strokeDashArray: 4 }, theme: { mode: isDark ? 'dark' : 'light' }, legend: { labels: { colors: isDark ? '#F0ECE6' : '#2C2A29' } } };
+        const optHealth = { series: [{ name: 'Сон', data: sleepData }, { name: 'Энергия', data: energyData }], chart: { type: 'area', height: 260, toolbar: { show: false }, fontFamily: 'DM Sans' }, colors: ['#7B9C83', '#D4A373'], fill: { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.05 } }, stroke: { curve: 'smooth', width: 3 }, xaxis: { categories: dates, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, yaxis: { max: 10, min: 0, tickAmount: 5, labels: { style: { colors: isDark ? '#948E87' : '#8C857D' } } }, grid: { borderColor: isDark ? '#383431' : '#EBE6DD', strokeDashArray: 4 }, theme: { mode: isDark ? 'dark' : 'light' }, legend: { labels: { colors: isDark ? '#F0ECE6' : '#2C2C29' } } };
         if (chartHealth) chartHealth.destroy(); chartHealth = new ApexCharts(document.querySelector("#chartHealth"), optHealth); chartHealth.render();
     }
 </script>
