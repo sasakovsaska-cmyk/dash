@@ -318,6 +318,7 @@
     let isRegisterMode = false;
     let isSecretAdminMode = false;
 
+    // Изначально пустые данные
     let appData = { settings: { theme: 'light' }, tasks: {}, health: {}, mindstream: [], habits: [], dayNotes: {}, importantEvents: [] };
     let pricingPlans = [
         { id: 'p1', name: '3 дня', days: 3, price: 99 },
@@ -326,9 +327,9 @@
         { id: 'p4', name: '1 год', days: 365, price: 3990 }
     ];
 
-    window.onerror = function(msg, url, line) { console.error("Глобальная ошибка:", msg, "в строке", line); };
+    window.onerror = function(msg, url, line) { console.error("Ошибка JS:", msg, "в строке", line); };
 
-    // СКРЫТАЯ АДМИНКА
+    // --- СКРЫТАЯ АДМИНКА ---
     let clickCount = 0;
     let clickTimer;
     document.getElementById('mainLogo').addEventListener('click', () => {
@@ -356,7 +357,7 @@
                 await loadPricing();
                 loadAdminData();
             } catch (e) {
-                alert("Ошибка фонового входа. Проверьте мастер-аккаунт в Firebase.");
+                alert("Ошибка входа в админку. Проверьте мастер-аккаунт в Firebase.");
                 document.getElementById('loadingText').style.display = 'none';
             }
         } else {
@@ -370,10 +371,10 @@
         signOut(auth);
     }
 
-    // ОБЫЧНАЯ ЛОГИКА
+    // --- АВТОРИЗАЦИЯ ---
     window.toggleAuthMode = function() {
         isRegisterMode = !isRegisterMode;
-        document.getElementById('authSubtitle').textContent = isRegisterMode ? 'Создание аккаунта' : 'Вход';
+        document.getElementById('authSubtitle').textContent = isRegisterMode ? 'Создание аккаунта' : 'Вход в облачный планер';
         document.getElementById('mainAuthBtn').textContent = isRegisterMode ? 'Зарегистрироваться' : 'Войти';
         document.getElementById('switchAuthBtn').textContent = isRegisterMode ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
         document.getElementById('authError').style.display = 'none';
@@ -384,9 +385,14 @@
         const pass = document.getElementById('passwordInput').value;
         const err = document.getElementById('authError');
         const btn = document.getElementById('mainAuthBtn');
+        
+        if (!email || !pass) { alert("Введите email и пароль"); return; }
+
         err.style.display = 'none';
         btn.textContent = 'Загрузка...';
+
         const authAction = isRegisterMode ? createUserWithEmailAndPassword : signInWithEmailAndPassword;
+
         authAction(auth, email, pass).catch((error) => {
             btn.textContent = isRegisterMode ? 'Зарегистрироваться' : 'Войти';
             err.style.display = 'block';
@@ -401,67 +407,70 @@
 
     onAuthStateChanged(auth, async (user) => {
         if (isSecretAdminMode) return;
+
         if (user) {
             currentUserId = user.uid;
             document.getElementById('authScreen').style.display = 'none';
             document.getElementById('loadingText').style.display = 'block';
+            
             try {
+                // 1. Загружаем данные из Firebase (или создаем новые)
                 await loadUserData(user.uid);
+                // 2. Загружаем тарифы
                 await loadPricing();
+                
                 document.getElementById('loadingText').style.display = 'none';
+                
+                // 3. Проверяем подписку и пускаем/блокируем
                 checkSubscription();
+                
+                // 4. Отправляем "пульс" онлайна
                 setInterval(() => {
-                    if(currentUserId && !isSecretAdminMode) updateDoc(doc(db, "users", currentUserId), { lastSeen: new Date().toISOString() }).catch(()=>{});
+                    if(currentUserId && !isSecretAdminMode) {
+                        updateDoc(doc(db, "users", currentUserId), { lastSeen: new Date().toISOString() }).catch(()=>{});
+                    }
                 }, 60000);
+
             } catch(e) {
-                console.error("Ошибка при загрузке данных:", e);
+                console.error("Критическая ошибка при входе:", e);
                 document.getElementById('loadingText').style.display = 'none';
-                alert("ОШИБКА ДОСТУПА К БАЗЕ: " + e.message + "\n\nСкорее всего, в Firebase не применены правила (Rules).");
+                alert("Ошибка доступа к базе данных! Скорее всего, не опубликованы правила (Rules).\n\n" + e.message);
                 document.getElementById('authScreen').style.display = 'flex';
                 document.getElementById('appContainer').style.display = 'none';
             }
         } else {
-            currentUserId = null; currentUserData = null;
+            currentUserId = null;
+            currentUserData = null;
             document.getElementById('authScreen').style.display = 'flex';
             document.getElementById('appContainer').style.display = 'none';
             document.getElementById('paymentScreen').style.display = 'none';
         }
     });
 
+    // Загрузка данных пользователя из Firestore
     async function loadUserData(uid) {
-        try {
-            // 1. Сначала берем из кэша браузера (на случай если Firebase упадет)
-            const cached = localStorage.getItem('lifeOS_cache');
-            if (cached) {
-                try { appData = JSON.parse(cached); } catch(e){}
-            }
+        const docRef = doc(db, "users", uid);
+        const docSnap = await getDoc(docRef);
 
-            const docSnap = await getDoc(doc(db, "users", uid));
-            if (docSnap.exists()) {
-                currentUserData = docSnap.data();
-                if (!currentUserData.subEndDate) {
-                    const now = new Date();
-                    currentUserData.subEndDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-                    await setDoc(doc(db, "users", uid), currentUserData);
-                }
-                if (currentUserData.appData) {
-                    appData = { ...appData, ...currentUserData.appData };
-                    localStorage.setItem('lifeOS_cache', JSON.stringify(appData));
-                }
-            } else {
-                const now = new Date();
-                const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                currentUserData = { email: auth.currentUser.email, createdAt: now.toISOString(), subEndDate: trialEnd.toISOString(), isBlocked: false, appData: appData, lastSeen: now.toISOString() };
-                await setDoc(doc(db, "users", uid), currentUserData);
+        if (docSnap.exists()) {
+            currentUserData = docSnap.data();
+            // Если структура appData битая, восстанавливаем базовую
+            if (currentUserData.appData) {
+                appData = { ...appData, ...currentUserData.appData };
             }
-        } catch (e) { 
-            console.error("Ошибка loadUserData:", e); 
-            // Если Firebase недоступен, работаем с тем, что есть в кэше
-            if (!currentUserData) {
-                const now = new Date();
-                const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                currentUserData = { email: auth.currentUser.email, createdAt: now.toISOString(), subEndDate: trialEnd.toISOString(), isBlocked: false, appData: appData, lastSeen: now.toISOString() };
-            }
+        } else {
+            // Если документа нет, создаем новый с пробным периодом 7 дней
+            const now = new Date();
+            const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+            currentUserData = {
+                email: auth.currentUser.email,
+                createdAt: now.toISOString(),
+                subEndDate: trialEnd.toISOString(), // Конец подписки
+                isBlocked: false, // Ручная блокировка
+                appData: appData, // Пустые задачи
+                lastSeen: now.toISOString()
+            };
+            await setDoc(docRef, currentUserData);
         }
     }
 
@@ -471,56 +480,60 @@
             if (docSnap.exists()) pricingPlans = docSnap.data().plans;
             renderPricingGrid();
             if (isSecretAdminMode) renderAdminPricing();
-        } catch (e) { console.error("Ошибка loadPricing:", e); }
+        } catch (e) { console.error("Ошибка тарифов:", e); }
     }
 
+    // Проверка: истекла ли подписка или заблокирован ли юзер
     function checkSubscription() {
         if (!currentUserData) return;
         const now = new Date();
-        if (currentUserData.isBlocked || now > new Date(currentUserData.subEndDate)) showPaymentScreen();
-        else showApp();
+        const subEnd = new Date(currentUserData.subEndDate);
+        
+        // Если заблокирован админом ИЛИ время вышло
+        if (currentUserData.isBlocked || now > subEnd) {
+            showPaymentScreen();
+        } else {
+            showApp();
+        }
     }
 
     function showApp() {
         document.getElementById('paymentScreen').style.display = 'none';
         document.getElementById('appContainer').style.display = 'flex';
-        if (appData.settings.theme === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); document.getElementById('themeBtn').innerHTML = '<i class="ph ph-sun"></i>'; }
-        try { initApp(); } catch(e) { console.error("Ошибка initApp:", e); }
+        if (appData.settings.theme === 'dark') { 
+            document.documentElement.setAttribute('data-theme', 'dark'); 
+            document.getElementById('themeBtn').innerHTML = '<i class="ph ph-sun"></i>'; 
+        }
+        initApp();
     }
 
-    function showPaymentScreen() { document.getElementById('appContainer').style.display = 'none'; document.getElementById('paymentScreen').style.display = 'flex'; }
+    function showPaymentScreen() {
+        document.getElementById('appContainer').style.display = 'none';
+        document.getElementById('paymentScreen').style.display = 'flex';
+    }
 
-    // ИСПРАВЛЕННОЕ СОХРАНЕНИЕ (Кэш + Firebase с выводом ошибки)
+    // --- СОХРАНЕНИЕ ДАННЫХ (ЖЕЛЕЗНОЕ) ---
     async function save() {
+        if (!currentUserId || isSecretAdminMode) return;
         try {
+            // Обновляем UI локально, чтобы не было задержек
             updateAI(); updateDashboardStats();
             if(document.getElementById('page-dashboard').classList.contains('active')) updateCharts();
             if(document.getElementById('page-planner').classList.contains('active')) renderMonthCalendar();
-            
-            // Сохраняем в кэш браузера моментально (защита от сбоя)
-            localStorage.setItem('lifeOS_cache', JSON.stringify(appData));
 
-            if (!currentUserId || isSecretAdminMode) return;
-            
-            try {
-                await setDoc(doc(db, "users", currentUserId), { ...currentUserData, appData: appData });
-            } catch (e) {
-                console.error("Ошибка Firebase:", e);
-                // Если ошибка прав, показываем пользователю
-                if(e.code === 'permission-denied' || e.message.includes('permission')) {
-                    alert("ОШИБКА: База данных запрещает сохранение. Администратор должен опубликовать правила (Rules) в Firebase.");
-                }
-            }
-        } catch(e) { console.error("Ошибка save:", e); }
+            // Пишем в Firebase
+            await setDoc(doc(db, "users", currentUserId), { 
+                ...currentUserData, 
+                appData: appData 
+            });
+            console.log("Сохранено в Firebase успешно");
+        } catch (e) {
+            console.error("Ошибка сохранения:", e);
+            alert("ВНИМАНИЕ! Не удалось сохранить данные в базу. Проверьте правила (Rules) в Firebase.\n\nКод ошибки: " + e.code);
+        }
     }
 
-    window.addEventListener('beforeunload', () => {
-        if (currentUserId && !isSecretAdminMode) {
-            localStorage.setItem('lifeOS_cache', JSON.stringify(appData));
-            setDoc(doc(db, "users", currentUserId), { ...currentUserData, appData: appData }).catch(()=>{});
-        }
-    });
-
+    // --- ОТРИСОВКА ТАРИФОВ И ОПЛАТЫ ---
     function renderPricingGrid() {
         const grid = document.getElementById('pricingGrid'); grid.innerHTML = '';
         pricingPlans.forEach(plan => {
@@ -539,25 +552,59 @@
 
     window.closeModal = function(id) { document.getElementById(id).classList.remove('active'); }
 
+    // --- АДМИН-ПАНЕЛЬ ---
     window.loadAdminData = async function() {
-        const tbody = document.querySelector('#adminUsersTable tbody'); tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Загрузка...</td></tr>';
+        const tbody = document.querySelector('#adminUsersTable tbody'); 
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Загрузка...</td></tr>';
         document.getElementById('adminSearch').value = '';
+        
         try {
-            const paySnap = await getDocs(collection(db, "payments")); let revenue = 0; paySnap.forEach(d => revenue += d.data().amount);
+            const paySnap = await getDocs(collection(db, "payments")); 
+            let revenue = 0; 
+            paySnap.forEach(d => revenue += d.data().amount);
             document.getElementById('adminRevenue').textContent = revenue.toLocaleString('ru-RU') + ' ₽';
-            const querySnapshot = await getDocs(collection(db, "users")); let totalUsers = 0; let onlineUsers = 0; const now = new Date();
+            
+            const querySnapshot = await getDocs(collection(db, "users")); 
+            let totalUsers = 0; 
+            let onlineUsers = 0; 
+            const now = new Date();
             tbody.innerHTML = '';
+            
             querySnapshot.forEach((doc) => {
-                const u = doc.data(); const uid = doc.id; if(u.email === MASTER_EMAIL) return;
-                totalUsers++; if (u.lastSeen && (now - new Date(u.lastSeen)) < 120000) onlineUsers++;
-                const isBlocked = u.isBlocked; const subEnd = new Date(u.subEndDate).toLocaleDateString('ru-RU'); const isExpired = new Date(u.subEndDate) < new Date();
-                let statusText = isBlocked ? '🚫 Заблок' : (isExpired ? '⌛ Истек' : '✅ Активен'); let statusColor = isBlocked ? 'var(--bad)' : (isExpired ? 'var(--warn)' : 'var(--good)');
+                const u = doc.data(); const uid = doc.id; 
+                if(u.email === MASTER_EMAIL) return;
+                
+                totalUsers++; 
+                if (u.lastSeen && (now - new Date(u.lastSeen)) < 120000) onlineUsers++;
+                
+                const isBlocked = u.isBlocked; 
+                const subEnd = new Date(u.subEndDate).toLocaleDateString('ru-RU'); 
+                const isExpired = new Date(u.subEndDate) < new Date();
+                
+                let statusText = isBlocked ? '🚫 Заблок' : (isExpired ? '⌛ Истек' : '✅ Активен'); 
+                let statusColor = isBlocked ? 'var(--bad)' : (isExpired ? 'var(--warn)' : 'var(--good)');
+                
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td class="user-email">${u.email}</td><td style="color:${statusColor}; font-weight:600;">${statusText}</td><td>${subEnd}</td><td><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 3)">💰 +3д</button><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 7)">💰 +7д</button><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 30)">💰 +30д</button><button class="admin-btn money" onclick="openPaymentLogger('${uid}', 365)">💰 +1г</button><button class="admin-btn outline" style="color:${isBlocked ? 'var(--good)' : 'var(--bad)'}; border-color:${isBlocked ? 'var(--good)' : 'var(--bad)'}" onclick="adminToggleBlock('${uid}', ${isBlocked})">${isBlocked ? 'Разблок' : 'Блок'}</button></td>`;
+                tr.innerHTML = `
+                    <td class="user-email">${u.email}</td>
+                    <td style="color:${statusColor}; font-weight:600;">${statusText}</td>
+                    <td>${subEnd}</td>
+                    <td>
+                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 3)">💰 +3д</button>
+                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 7)">💰 +7д</button>
+                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 30)">💰 +30д</button>
+                        <button class="admin-btn money" onclick="openPaymentLogger('${uid}', 365)">💰 +1г</button>
+                        <button class="admin-btn outline" style="color:${isBlocked ? 'var(--good)' : 'var(--bad)'}; border-color:${isBlocked ? 'var(--good)' : 'var(--bad)'}" onclick="adminToggleBlock('${uid}', ${isBlocked})">${isBlocked ? 'Разблок' : 'Блок'}</button>
+                    </td>`;
                 tbody.appendChild(tr);
             });
-            document.getElementById('adminTotalUsers').textContent = totalUsers; document.getElementById('adminOnline').textContent = onlineUsers;
-        } catch(e) { console.error(e); tbody.innerHTML = '<tr><td colspan="4" style="color:red;">Ошибка (Проверьте Rules)</td></tr>'; }
+            
+            document.getElementById('adminTotalUsers').textContent = totalUsers; 
+            document.getElementById('adminOnline').textContent = onlineUsers;
+        } catch(e) { 
+            console.error(e); 
+            tbody.innerHTML = '<tr><td colspan="4" style="color:red;">Ошибка (Проверьте Rules)</td></tr>'; 
+        }
     }
 
     window.filterAdminTable = function() {
@@ -569,37 +616,73 @@
         });
     }
 
-    window.openPaymentLogger = function(uid, days) { document.getElementById('paymentUid').value = uid; document.getElementById('paymentDays').value = days; document.getElementById('paymentAmountInput').value = ''; document.getElementById('paymentLogModal').classList.add('active'); }
+    window.openPaymentLogger = function(uid, days) { 
+        document.getElementById('paymentUid').value = uid; 
+        document.getElementById('paymentDays').value = days; 
+        document.getElementById('paymentAmountInput').value = ''; 
+        document.getElementById('paymentLogModal').classList.add('active'); 
+    }
     
     window.confirmPaymentLog = async function() {
-        const uid = document.getElementById('paymentUid').value; const days = Number(document.getElementById('paymentDays').value); const amount = Number(document.getElementById('paymentAmountInput').value);
+        const uid = document.getElementById('paymentUid').value; 
+        const days = Number(document.getElementById('paymentDays').value); 
+        const amount = Number(document.getElementById('paymentAmountInput').value);
+        
         if (!amount || amount <= 0) return alert('Введите корректную сумму');
+        
         try {
-            const userRef = doc(db, "users", uid); const userSnap = await getDoc(userRef); const userData = userSnap.data();
+            const userRef = doc(db, "users", uid); 
+            const userSnap = await getDoc(userRef); 
+            const userData = userSnap.data();
+            
+            // Записываем транзакцию
             await addDoc(collection(db, "payments"), { uid: uid, email: userData.email, amount: amount, date: new Date().toISOString(), days: days });
-            let currentEnd = new Date(userData.subEndDate); let now = new Date(); let startFrom = currentEnd > now ? currentEnd : now; let newEnd = new Date(startFrom.getTime() + days * 24 * 60 * 60 * 1000);
+            
+            // Продлеваем подписку
+            let currentEnd = new Date(userData.subEndDate); 
+            let now = new Date(); 
+            let startFrom = currentEnd > now ? currentEnd : now; 
+            let newEnd = new Date(startFrom.getTime() + days * 24 * 60 * 60 * 1000);
+            
             await updateDoc(userRef, { subEndDate: newEnd.toISOString(), isBlocked: false });
-            closeModal('paymentLogModal'); loadAdminData();
+            
+            closeModal('paymentLogModal'); 
+            loadAdminData();
         } catch(e) { alert("Ошибка: " + e.message); }
     }
 
-    window.adminToggleBlock = async function(uid, currentStatus) { try { await updateDoc(doc(db, "users", uid), { isBlocked: !currentStatus }); loadAdminData(); } catch(e) {} }
+    window.adminToggleBlock = async function(uid, currentStatus) { 
+        try { await updateDoc(doc(db, "users", uid), { isBlocked: !currentStatus }); loadAdminData(); } catch(e) {} 
+    }
 
     window.renderAdminPricing = function() {
         const container = document.getElementById('pricingSettings'); container.innerHTML = '';
         pricingPlans.forEach((plan, idx) => {
-            container.innerHTML += `<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;"><input type="text" class="input-field" value="${plan.name}" id="pname-${idx}" placeholder="Название"><input type="number" class="input-field" value="${plan.days}" id="pdays-${idx}" placeholder="Дней"><input type="number" class="input-field" value="${plan.price}" id="pprice-${idx}" placeholder="Цена (₽)"></div>`;
+            container.innerHTML += `
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+                    <input type="text" class="input-field" value="${plan.name}" id="pname-${idx}" placeholder="Название">
+                    <input type="number" class="input-field" value="${plan.days}" id="pdays-${idx}" placeholder="Дней">
+                    <input type="number" class="input-field" value="${plan.price}" id="pprice-${idx}" placeholder="Цена (₽)">
+                </div>`;
         });
     }
 
     window.savePricingSettings = async function() {
         let newPlans = [];
-        pricingPlans.forEach((plan, idx) => { newPlans.push({ id: plan.id, name: document.getElementById(`pname-${idx}`).value, days: Number(document.getElementById(`pdays-${idx}`).value), price: Number(document.getElementById(`pprice-${idx}`).value) }); });
-        try { await setDoc(doc(db, "settings", "pricing"), { plans: newPlans }); pricingPlans = newPlans; alert("Тарифы обновлены!"); renderPricingGrid(); } catch(e) { alert("Ошибка: " + e.message); }
+        pricingPlans.forEach((plan, idx) => { 
+            newPlans.push({ id: plan.id, name: document.getElementById(`pname-${idx}`).value, days: Number(document.getElementById(`pdays-${idx}`).value), price: Number(document.getElementById(`pprice-${idx}`).value) }); 
+        });
+        try { 
+            await setDoc(doc(db, "settings", "pricing"), { plans: newPlans }); 
+            pricingPlans = newPlans; 
+            alert("Тарифы обновлены!"); 
+            renderPricingGrid(); 
+        } catch(e) { alert("Ошибка: " + e.message); }
     }
 
-    // ЛОГИКА ПЛАНЕРА
+    // --- ЛОГИКА ПЛАНЕРА ---
     const emojis = { sleep: '😴', energy: '🔋', mood: '🤩', water: '💧', food: '🍏', sport: '🏋️' };
+    
     function initApp() {
         ['sleep', 'energy', 'mood', 'water', 'food', 'sport'].forEach(metric => {
             const scale = document.getElementById('rs' + metric.charAt(0).toUpperCase() + metric.slice(1));
@@ -612,11 +695,16 @@
                 scale.innerHTML += `<div class="rating-item" onclick="setRating('${metric}', ${i})">${emoji}</div>`;
             }
         });
-        updateDashboardStats(); setTimeout(() => updateCharts(), 100); renderThoughts(); loadHealthData(); renderHabits();
+        updateDashboardStats(); 
+        setTimeout(() => updateCharts(), 100); 
+        renderThoughts(); 
+        loadHealthData(); 
+        renderHabits();
     }
 
     window.switchPage = function(pageId, btn) {
-        document.querySelectorAll('.page').forEach(el => el.classList.remove('active')); document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(el => el.classList.remove('active')); 
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
         document.getElementById('page-' + pageId).classList.add('active'); btn.classList.add('active');
         if(pageId === 'dashboard') { updateDashboardStats(); setTimeout(() => updateCharts(), 50); }
         if(pageId === 'health') { loadHealthData(); renderThoughts(); }
